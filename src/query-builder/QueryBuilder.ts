@@ -24,6 +24,7 @@ import {In} from "../find-options/operator/In";
 import {EntityColumnNotFound} from "../error/EntityColumnNotFound";
 import { TypeORMError } from "../error";
 import { WhereClause, WhereClauseCondition } from "./WhereClause";
+import {escapeRegExp} from "../util/escapeRegExp";
 
 // todo: completely cover query builder with tests
 // todo: entityOrProperty can be target name. implement proper behaviour if it is.
@@ -610,10 +611,6 @@ export abstract class QueryBuilder<Entity> {
      * Replaces all entity's propertyName to name in the given statement.
      */
     protected replacePropertyNames(statement: string) {
-        // Escape special characters in regular expressions
-        // Per https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions#Escaping
-        const escapeRegExp = (s: String) => s.replace(/[.*+\-?^${}()|[\]\\]/g, "\\$&");
-
         for (const alias of this.expressionMap.aliases) {
             if (!alias.hasMetadata) continue;
             const replaceAliasNamePrefix = this.expressionMap.aliasNamePrefixingEnabled ? `${alias.name}.` : "";
@@ -654,19 +651,40 @@ export abstract class QueryBuilder<Entity> {
                 replacements[column.propertyPath] = column.databaseName;
             }
 
-            const replacementKeys = Object.keys(replacements);
-
-            if (replacementKeys.length) {
-                statement = statement.replace(new RegExp(
+            // const replacementKeys = Object.keys(replacements);
+            //
+            // if (replacementKeys.length) {
+            //     statement = statement.replace(new RegExp(
+            //         // Avoid a lookbehind here since it's not well supported
+            //         `([ =\(]|^.{0})` +
+            //         `${escapeRegExp(replaceAliasNamePrefix)}(${replacementKeys.map(escapeRegExp).join("|")})` +
+            //         `(?=[ =\)\,]|.{0}$)`,
+            //         "gm"
+            //     ), (_, pre, p) =>
+            //         `${pre}${replacementAliasNamePrefix}${this.escape(replacements[p])}`
+            //     );
+            // }
+            statement = statement.replace(
+                new RegExp(
                     // Avoid a lookbehind here since it's not well supported
-                    `([ =\(]|^.{0})` +
-                    `${escapeRegExp(replaceAliasNamePrefix)}(${replacementKeys.map(escapeRegExp).join("|")})` +
+                    `([ =\(]|^.{0})` + // any of ' =(' or start of line
+                    // followed by our prefix, e.g. 'tablename.' or ''
+                    `${escapeRegExp(
+                        replaceAliasNamePrefix,
+                    )}([^ =\(\)\,]+)` + // a possible property name: sequence of anything but ' =(),'
+                    // terminated by ' =),' or end of line
                     `(?=[ =\)\,]|.{0}$)`,
-                    "gm"
-                ), (_, pre, p) =>
-                    `${pre}${replacementAliasNamePrefix}${this.escape(replacements[p])}`
-                );
-            }
+                    "gm",
+                ),
+                (match, pre, p) => {
+                    if (replacements[p]) {
+                        return `${pre}${replacementAliasNamePrefix}${this.escape(
+                            replacements[p],
+                        )}`;
+                    }
+                    return match;
+                },
+            );
         }
 
         return statement;
