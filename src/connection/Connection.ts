@@ -519,6 +519,17 @@ export class Connection {
     }
 
     defaultReplicationModeForReads(): ReplicationMode {
-        return this.options.driver.replication && this.options.driver.replication.slaves.length ? this.options.driver.replication.defaultMode || "slave" : "slave";
+        const hasReplicationProperty = this.driver.options && "replication" in this.driver.options;
+        if (hasReplicationProperty) {
+            const value = (
+                (this.driver.options as any).replication as {
+                    defaultMode?: ReplicationMode
+                }
+            ).defaultMode;
+            if (value) {
+                return value;
+            }
+        }
+        return "slave";
     }
 }
