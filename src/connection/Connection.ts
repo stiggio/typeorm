@@ -517,4 +517,8 @@ export class Connection {
         // validate all created entity metadatas to make sure user created entities are valid and correct
         entityMetadataValidator.validateMany(this.entityMetadatas.filter(metadata => metadata.tableType !== "view"), this.driver);
     }
+
+    defaultReplicationModeForReads(): ReplicationMode {
+        return this.options.driver.replication && this.options.driver.replication.slaves.length ? this.options.driver.replication.defaultMode || "slave" : "slave";
+    }
 }
