@@ -519,7 +519,8 @@ export class Connection {
     }
 
     defaultReplicationModeForReads(): ReplicationMode {
-        const hasReplicationProperty = this.driver.options && "replication" in this.driver.options;
+        const hasReplicationProperty = this.driver.options && "replication" in this.driver.options &&
+            this.driver.options["replication"] !== undefined;
         if (hasReplicationProperty) {
             const value = (
                 (this.driver.options as any).replication as {
